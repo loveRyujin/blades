@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 
 	"github.com/go-kratos/blades"
@@ -10,23 +11,37 @@ import (
 )
 
 func main() {
-	weatherHandler := blades.NewFuncTool(
-		"get_weather",
-		"Get the current weather for a given city",
-		&jsonschema.Schema{
+	weatherTool := &blades.Tool{
+		Name:        "get_weather",
+		Description: "Get the current weather for a given city",
+		InputSchema: &jsonschema.Schema{
 			Type: "object",
 			Properties: map[string]*jsonschema.Schema{
 				"location": {Type: "string"},
 			},
 			Required: []string{"location"},
 		},
-		func(ctx context.Context, input string) (string, error) {
-			log.Println("Fetching weather for:", input)
-			return "Sunny, 25°C", nil
-		},
-	)
+		Handler: blades.HandleFunc(func(ctx context.Context, input string) (string, error) {
+			var payload struct {
+				Location string `json:"location"`
+			}
+			if err := json.Unmarshal([]byte(input), &payload); err != nil {
+				return "", err
+			}
+			log.Println("Fetching weather for:", payload.Location)
+
+			result := struct {
+				Forecast string `json:"forecast"`
+			}{Forecast: "Sunny, 25°C"}
+			encoded, err := json.Marshal(result)
+			if err != nil {
+				return "", err
+			}
+			return string(encoded), nil
+		}),
+	}
 	tools := []*blades.Tool{
-		weatherHandler,
+		weatherTool,
 	}
 	agent := blades.NewAgent(
 		"Weather Agent",
